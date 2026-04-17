@@ -16,6 +16,7 @@ dependencies = [
     "torchvision",
     "pillow>=12.2.0",
     "ipykernel>=7.2.0",
+    "opencv-python>=4.13.0.92",
 ]
 
 [tool.uv.sources]
