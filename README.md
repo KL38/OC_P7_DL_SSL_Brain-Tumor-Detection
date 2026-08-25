@@ -1,499 +1,461 @@
 <a id="readme-top"></a>
 
-<!-- SHIELDS -->
 <div align="center">
 
-[![Python][python-shield]][python-url]
-[![PyTorch][pytorch-shield]][pytorch-url]
-[![scikit-learn][sklearn-shield]][sklearn-url]
-[![uv][uv-shield]][uv-url]
-[![Licence][license-shield]][license-url]
-[![OpenClassrooms][oc-shield]][oc-url]
+# 🧠 Brain Tumour Detection — Semi-Supervised Learning
+
+**Label 1 406 unannotated brain MRI scans by clustering, then use those pseudo-labels
+to train a CNN that beats pure supervision — on the exact same annotation budget.**
+
+*OpenClassrooms project P7 — "Label and apply semi-supervised approaches to image processing"*
+
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-CUDA_12.8-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=uv&logoColor=white)](https://docs.astral.sh/uv/)
+[![OpenClassrooms](https://img.shields.io/badge/OpenClassrooms-Project_7-7451EB)](https://openclassrooms.com/)
 
 </div>
 
-<!-- PROJECT HEADER -->
-<br />
-<div align="center">
-  <h1 align="center">🧠 OC_P7 — Détection de tumeurs cérébrales par apprentissage semi-supervisé</h1>
+---
 
-  <p align="center">
-    Labelliser 1406 IRM non étiquetées par clustering, puis exploiter ces pseudo-labels
-    pour entraîner un CNN qui bat le supervisé pur — avec seulement 100 images annotées.
-    <br />
-    <br />
-    <a href="#pipeline-méthodologique"><strong>Explorer la méthodologie »</strong></a>
-    <br />
-    <br />
-    <a href="Clustering%20GMM.v4.opti.ipynb">Notebook clustering</a>
-    &middot;
-    <a href="Modelisations.v4.ipynb">Notebook modélisation</a>
-    &middot;
-    <a href="https://github.com/KL38/OC_P7/issues">Signaler un bug</a>
-  </p>
-</div>
+## 📊 Results
 
-<!-- TABLE DES MATIÈRES -->
+Only **100 of the 1 506 MRI scans carry an expert label**. The question this project answers is
+whether the 1 406 unlabelled ones can be made to count for something.
+
+All four phases are scored on the **same held-out set of 30 expert-labelled images**.
+Cancer is the positive class, so **recall** and **F2** (recall weighted ×2) outrank accuracy —
+a missed tumour costs far more than a false alarm.
+
+| Metric (%) | ① Unsupervised<br/>*GMM clusters* | ② Semi-supervised<br/>*CNN on 1 225 pseudo-labels* | ③ Semi-supervised + fine-tuning<br/>*+ 70 expert labels* | ④ Supervised<br/>*70 expert labels only* |
+|:---|:---:|:---:|:---:|:---:|
+| **Accuracy** | 80 | 83 | 🟢 **90** | 🔴 77 |
+| **Recall** | 60 | 67 | 🟢 **87** | 🔴 80 |
+| **F2** | 65 | 71 | 🟢 **88** | 🔴 79 |
+| **ARI** | 34 | 43 | 🟢 **63** | 🔴 26 |
+
+> **③ versus ④ is the whole point.** Both models see exactly the same 70 expert labels.
+> The one that was first pre-trained on cluster-derived pseudo-labels wins by
+> **+13 points of accuracy, +7 of recall and +37 of ARI** — for zero additional annotation.
+
+**Pushing further.** A second study swaps the hand-rolled CNN for a pre-trained
+**EfficientNet-B4** and applies three state-of-the-art SSL methods:
+
+| Model (%) | Accuracy | Recall | F2 |
+|:---|:---:|:---:|:---:|
+| EfficientNet-B4 — supervised baseline | 97 | 93 | 95 |
+| + Pseudo-Labeling | 97 | 93 | 95 |
+| + Mean Teacher | 97 | 93 | 95 |
+| **+ FixMatch** | 97 | 🟢 **100** | 🟢 **99** |
+
+**FixMatch misses no tumour at all** on the validation set — at the cost of one extra
+false alarm. In screening, that is exactly the right trade.
+
+---
+
 <details>
-  <summary>Table des matières</summary>
-  <ol>
-    <li>
-      <a href="#à-propos-du-projet">À propos du projet</a>
-      <ul>
-        <li><a href="#le-dataset">Le dataset</a></li>
-        <li><a href="#résultats-clés">Résultats clés</a></li>
-        <li><a href="#construit-avec">Construit avec</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#pour-commencer">Pour commencer</a>
-      <ul>
-        <li><a href="#prérequis">Prérequis</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#utilisation">Utilisation</a></li>
-    <li>
-      <a href="#pipeline-méthodologique">Pipeline méthodologique</a>
-      <ul>
-        <li><a href="#1--eda">1 · EDA</a></li>
-        <li><a href="#2--extraction-de-features-embeddings">2 · Extraction de features</a></li>
-        <li><a href="#3--clustering-non-supervisé">3 · Clustering non supervisé</a></li>
-        <li><a href="#4--modélisation-en-3-phases">4 · Modélisation en 3 phases</a></li>
-        <li><a href="#5--optimisation-ssl-sota">5 · Optimisation SSL SOTA</a></li>
-      </ul>
-    </li>
-    <li><a href="#résultats-détaillés">Résultats détaillés</a></li>
-    <li><a href="#structure-du-projet">Structure du projet</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contribuer">Contribuer</a></li>
-    <li><a href="#licence">Licence</a></li>
-    <li><a href="#contact">Contact</a></li>
-    <li><a href="#remerciements">Remerciements</a></li>
-  </ol>
+<summary>📑 Table of contents</summary>
+
+- [Results](#-results)
+- [About the project](#-about-the-project)
+- [The dataset](#-the-dataset)
+- [Strategy](#-strategy)
+- [Pipeline](#-pipeline)
+  - [1 · Exploratory analysis](#1--exploratory-analysis)
+  - [2 · Feature extraction](#2--feature-extraction)
+  - [3 · Unsupervised clustering](#3--unsupervised-clustering)
+  - [4 · Three-phase modelling](#4--three-phase-modelling)
+  - [5 · State-of-the-art SSL](#5--state-of-the-art-ssl)
+- [Reading the results](#-reading-the-results)
+- [Getting started](#-getting-started)
+- [Repository layout](#-repository-layout)
+- [Limitations](#-limitations)
+- [Licence & disclaimer](#-licence--disclaimer)
+
 </details>
 
-## À propos du projet
+## 📌 About the project
 
-**Projet 7** du parcours *Data Scientist & Machine Learning Engineer* d'OpenClassrooms :
-*« Labellisez et appliquez des approches semi-supervisées en traitement d'images »*.
+The problem is the classic one in medical imaging: **data is plentiful, annotation is not.**
+1 506 brain MRI scans are available, but only 100 have been labelled by an expert.
+Training a CNN on 100 images gives an unstable model; leaving the other 1 406 untouched
+wastes most of the dataset.
 
-Le problème posé est celui, très classique en imagerie médicale, du **déséquilibre entre données
-et annotations** : 1506 IRM cérébrales disponibles, mais seulement 100 étiquetées par un expert.
-Entraîner un CNN sur 100 images donne un modèle instable ; laisser dormir les 1406 autres est un
-gâchis.
+The strategy chains all three learning regimes:
 
-La stratégie retenue exploite les trois régimes d'apprentissage en cascade :
+1. **Unsupervised** — cluster frozen-CNN embeddings to obtain *weak but plentiful* labels.
+2. **Semi-supervised** — train a CNN on those 1 225 pseudo-labels to learn good visual
+   representations.
+3. **Supervised** — fine-tune only the classification head on the expert labels, to recalibrate
+   the decision boundary.
 
-```
-Non supervisé            Semi-supervisé              Supervisé
-─────────────            ──────────────              ─────────
-Embeddings CNN     →     CNN entraîné sur      →     Fine-tuning de la tête
-+ PCA + GMM              1406 pseudo-labels          sur 100 labels experts
-(labels faibles)         (représentations)           (calibration finale)
-```
+The bet is that representations can be learned from noisy labels, and that scarce expert labels
+are better spent on calibration than on learning from scratch. The results say the bet paid off.
 
-L'intuition : le clustering fournit des **labels faibles mais nombreux** qui permettent au réseau
-d'apprendre de bonnes représentations visuelles, puis les **labels forts mais rares** servent
-uniquement à recalibrer la frontière de décision. Le résultat valide l'approche — le pipeline
-semi-supervisé (90 % accuracy) dépasse nettement le supervisé pur entraîné sur les mêmes
-labels experts (77 %).
+## 🩻 The dataset
 
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
+1 506 brain MRI scans, uniformly 512×512, RGB, JPEG.
 
-### Le dataset
+<div align="center">
+  <img src="docs/dataset-samples.png" width="620"
+       alt="Nine sample MRI scans, three per class: cancer, normal, and unlabelled" />
+  <br />
+  <em>The three populations. Note how little separates a tumour from healthy tissue to the
+  untrained eye — and how varied the anatomical planes are.</em>
+</div>
 
-1506 clichés IRM cérébrales, résolution unique 512×512, mode RGB, format JPEG.
-
-| Sous-ensemble | Volume | Rôle |
+| Subset | Volume | Role |
 |---|---|---|
-| `data/sans_label/` | 1406 images | Corpus non étiqueté → clustering & pseudo-labels |
-| `data/avec_labels/cancer/` | 50 images | Vérité terrain — cerveaux tumoraux |
-| `data/avec_labels/normal/` | 50 images | Vérité terrain — cerveaux sains |
+| `data/sans_label/` | 1 406 images | Unlabelled corpus → clustering & pseudo-labels |
+| `data/avec_labels/cancer/` | 50 images | Ground truth — tumour |
+| `data/avec_labels/normal/` | 50 images | Ground truth — healthy |
 
-Les 100 images labellisées sont découpées en **70 train / 30 validation** (stratifié,
-`random_state=42`) et ne servent **jamais** au clustering — une assertion anti-fuite vérifie
-l'absence de chevauchement entre les deux populations à chaque exécution.
+The 100 labelled images are split **70 train / 30 validation** (stratified, `random_state=42`)
+and are **never** used for clustering — an anti-leakage assertion checks for overlap between the
+two populations on every run.
 
 > [!NOTE]
-> Le dossier `data/` et les fichiers `*.csv` sont exclus du versionnement (voir `.gitignore`).
-> Les images et les embeddings doivent être régénérés localement.
+> `data/`, `embeddings/`, the `.csv` artefacts and the `.pth` weights are **not versioned**.
+> They are all regenerated by running the notebooks in order.
 
-### Résultats clés
+## 🧭 Strategy
 
-Évaluation sur le **val set de 30 images labellisées** jamais vues à l'entraînement.
-Le cancer étant la classe positive, le **F2-score** (recall pondéré ×2) et le **recall** priment
-sur l'accuracy : un faux négatif coûte bien plus cher qu'une fausse alarme.
+```mermaid
+flowchart LR
+    A["<b>PyTorch Dataset</b><br/>1 506 MRI · 512×512×3<br/>Resize 224×224<br/>ImageNet normalisation"]
 
-| Approche | Accuracy | Recall | F2 | ARI |
-|---|:---:|:---:|:---:|:---:|
-| GMM seul — pseudo-labels bruts *(baseline)* | 0.800 | 0.600 | 0.652 | 0.341 |
-| **Phase 1** — CNN sur 1225 pseudo-labels | 0.833 | 0.667 | 0.714 | 0.427 |
-| **Phase 2** — fine-tuning sur 70 labels forts | **0.900** | **0.867** | **0.878** | **0.627** |
-| **Phase 3** — supervisé pur (70 labels) | 0.767 | 0.800 | 0.789 | 0.259 |
+    subgraph FEAT ["Feature extraction"]
+        direction TB
+        B["<b>Embedding</b><br/>ResNet-50 → 2 048<br/>EfficientNet-B4 → 1 792<br/><i>frozen backbones</i>"]
+        C["<b>Processing</b><br/>StandardScaler<br/>PCA 95% → 379 components"]
+        B --> C
+    end
 
-**+13,3 points d'accuracy** et **+0,37 d'ARI** pour le pipeline semi-supervisé face au supervisé
-pur, à budget d'annotation strictement identique.
+    subgraph UNSUP ["Unsupervised"]
+        D["<b>Clustering</b><br/>K-Means · DBSCAN · GMM<br/>t-SNE inspection"]
+    end
 
-Le volet [Optimisation](Optimisation/) pousse l'exercice plus loin en remplaçant le CNN maison par
-un **EfficientNet-B4 pré-entraîné** et en appliquant trois méthodes SSL de l'état de l'art
-(Pseudo-Labeling itératif, Mean Teacher, FixMatch) : **0.967 accuracy / 0.867 ARI**, avec un
-**recall de 1.000** pour FixMatch — aucun cancer manqué sur le val set.
+    subgraph SEMI ["Semi-supervised"]
+        E["<b>CNN</b><br/>trained on weak labels<br/>then head fine-tuned"]
+    end
 
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
+    subgraph SUP ["Supervised — control"]
+        F["<b>CNN</b><br/>strong labels only<br/>trained from scratch"]
+    end
 
-### Construit avec
+    G(["100 expert labels"])
 
-* [![PyTorch][pytorch-shield]][pytorch-url] — CNN, Grad-CAM, extraction de features (CUDA 12.8)
-* [![Torchvision][torchvision-shield]][torchvision-url] — ResNet-50 & EfficientNet-B4 pré-entraînés ImageNet
-* [![scikit-learn][sklearn-shield]][sklearn-url] — PCA, GMM, t-SNE, Random Forest, métriques
-* [![NumPy][numpy-shield]][numpy-url] · [![Pandas][pandas-shield]][pandas-url] — manipulation de données
-* [![Matplotlib][matplotlib-shield]][matplotlib-url] · [![Plotly][plotly-shield]][plotly-url] — visualisation
-* [![OpenCV][opencv-shield]][opencv-url] — superposition des cartes Grad-CAM
-* [![Jupyter][jupyter-shield]][jupyter-url] — notebooks d'analyse
-* [![uv][uv-shield]][uv-url] — gestion des dépendances et de l'environnement
+    A --> B
+    C --> D
+    D -->|"1 225 weak labels"| E
+    C --> F
+    G -.->|"refine the decision boundary"| E
+    G -.-> F
 
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
+    classDef feat fill:#FFF3E0,stroke:#EF9A00,color:#000
+    classDef unsup fill:#E8F5E9,stroke:#43A047,color:#000
+    classDef semi fill:#FFFDE7,stroke:#FBC02D,color:#000
+    classDef sup fill:#F3E5F5,stroke:#7B1FA2,color:#000
+    class B,C feat
+    class D unsup
+    class E semi
+    class F sup
+```
 
-## Pour commencer
+## 🔬 Pipeline
 
-### Prérequis
+### 1 · Exploratory analysis
 
-* **Python 3.12** (contrainte `>=3.12,<3.14`)
-* **[uv](https://docs.astral.sh/uv/)** — gestionnaire de paquets et d'environnements
+Inventory of the 1 506 files, integrity check (every image opened with PIL, corrupted files
+reported explicitly), resolution and colour-mode homogeneity, and IQR outlier detection on file
+size — with every suspect image displayed for visual arbitration.
+
+**Verdict:** a perfectly homogeneous dataset (512×512, RGB). No cleaning required.
+
+### 2 · Feature extraction
+
+Two ImageNet backbones are compared with **every layer frozen** (`eval()` + `no_grad()`, no
+gradient descent at all): the network is used as a pure visual descriptor extractor.
+
+<div align="center">
+  <img src="docs/resnet50-feature-extractor.png" width="470"
+       alt="ResNet-50 with its final fully-connected layer replaced by nn.Identity, exposing a 2048-dimension embedding" />
+  <img src="docs/efficientnet-b4-feature-extractor.png" width="470"
+       alt="EfficientNet-B4 with its classification head removed, exposing a 1792-dimension embedding" />
+  <br />
+  <em>Both networks are decapitated: the classification head is dropped and the pooled feature
+  vector becomes the output. ResNet-50 yields 2 048 dimensions, EfficientNet-B4 yields 1 792.</em>
+</div>
+
+Shared preprocessing: `Resize(224, 224)` → `ToTensor()` → `Normalize()` with ImageNet statistics.
+
+**Dimensionality reduction** — standardisation, then PCA at 95 % explained variance:
+
+<div align="center">
+  <img src="docs/pca-explained-variance.png" width="700"
+       alt="Cumulative explained variance curve for PCA on EfficientNet-B4 embeddings, crossing 95 percent at 379 components" />
+  <br />
+  <em>EfficientNet-B4: 1 792 dimensions collapse to <b>379 components</b> for 95 % of the
+  variance. ResNet-50 needs 658 — a first argument for the former.</em>
+</div>
+
+### 3 · Unsupervised clustering
+
+Three algorithm families, scored by ARI against the 100 labelled images:
+
+| Algorithm | ARI | Verdict |
+|---|:---:|---|
+| DBSCAN | — | Rejected — no exploitable density structure in high dimension |
+| K-Means (ResNet-50) | 0.24 | Rejected |
+| K-Means (EfficientNet-B4) | 0.33 | Rejected — linear boundaries too rigid |
+| **GMM (EfficientNet-B4)** | **0.31 → 0.35** | **Selected** — full covariances, probabilistic output |
+
+The GMM wins less on raw score than on its **probabilistic output**: `predict_proba()` gives a
+per-image confidence, which is what makes pseudo-label filtering possible downstream.
+
+<div align="center">
+  <img src="docs/tsne-gmm-clusters.png" width="460"
+       alt="t-SNE of EfficientNet-B4 embeddings coloured by the two GMM clusters, showing four distinct blobs" />
+  <img src="docs/tsne-true-labels.png" width="460"
+       alt="Same t-SNE with the 100 expert labels overlaid in red and green, showing cancer and normal cases spread across all four blobs" />
+  <br />
+  <em><b>Left:</b> GMM with k=2 — but the map clearly shows <b>four</b> blobs, not two.
+  <b>Right:</b> the same map with expert labels overlaid — cancer (red) and normal (green)
+  are spread across every blob.</em>
+</div>
+
+**That contradiction is the key finding of the project.** The clustering had not separated
+pathology at all — it had separated **anatomical slice planes** (axial, sagittal, coronal),
+because that is the dominant visual signal. Fitting `k=4` and *then* mapping clusters onto
+classes (C0 → normal, C1/C2/C3 → cancer) works *with* that latent structure instead of
+fighting it.
+
+The four optimisation rounds:
+
+| Version | Strategy | Guiding idea |
+|---|---|---|
+| **V1** | GMM `k=2`, no filtering | Baseline — 1 406 raw pseudo-labels |
+| **V2** | Confidence threshold on Euclidean distance to centroids | Drop the boundary points |
+| **V3** | Confidence threshold via Out-Of-Fold logistic regression | Calibrated rather than geometric confidence |
+| **V4** | GMM `k=4` + Out-Of-Fold Random Forest cleaning | **Final version** |
+
+Pseudo-labels are then **cleaned by a calibrated Random Forest** (500 trees, `max_depth=12`,
+`class_weight='balanced'`, Platt calibration in an inner 3-fold CV, Out-Of-Fold predictions over
+a 5-fold `StratifiedKFold` — 15 fits in total): each image gets an out-of-sample confidence, and
+**1 225 of the 1 406 images** clear the retained threshold.
+
+> The Random Forest reaches **0.971 OOF accuracy** at predicting the clusters — the clusters are
+> geometrically very well separated, which is what legitimises the filtering.
+
+### 4 · Three-phase modelling
+
+**`MyCNN`** — a hand-rolled CNN, 1 701 410 parameters: five
+`Conv2d → BatchNorm2d → ReLU → MaxPool2d` blocks (32 → 512 channels, 224 px → 7 px), then
+Global Average Pooling, dropout 0.4 and a two-class linear head.
+
+**Phase 2 — semi-supervised.** Every weight is trainable; the network learns its
+representations from the 1 225 weak labels.
+
+```mermaid
+flowchart LR
+    IN(["MRI<br/>224×224×3"])
+    B1["Conv2d 3→32<br/>3×3 · BN · ReLU"]
+    P1["MaxPool<br/>224→112"]
+    B2["Conv2d 32→64<br/>3×3 · BN · ReLU"]
+    P2["MaxPool<br/>112→56"]
+    B3["Conv2d 64→128<br/>3×3 · BN · ReLU"]
+    P3["MaxPool<br/>56→28"]
+    B4["Conv2d 128→256<br/>3×3 · BN · ReLU"]
+    P4["MaxPool<br/>28→14"]
+    B5["Conv2d 256→512<br/>3×3 · BN · ReLU"]
+    P5["MaxPool<br/>14→7"]
+    HEAD["<b>Head</b><br/>Global Average Pooling · Flatten<br/>Dropout 0.4 · Linear 512→256 · ReLU<br/>Dropout 0.4 · Linear 256→2"]
+    OUT(["Weak labels<br/>1 225 images"])
+    TRAIN["all 1 701 410 weights trainable<br/>LR 0.001 · 8 epochs"]
+
+    IN --> B1 --> P1 --> B2 --> P2 --> B3 --> P3 --> B4 --> P4 --> B5 --> P5 --> HEAD --> OUT
+    TRAIN -.- HEAD
+
+    classDef conv fill:#E8EAF6,stroke:#3F51B5,color:#000
+    classDef pool fill:#E8F5E9,stroke:#43A047,color:#000
+    classDef head fill:#F3E5F5,stroke:#7B1FA2,color:#000
+    classDef note fill:#FFEBEE,stroke:#C62828,color:#000
+    class B1,B2,B3,B4,B5 conv
+    class P1,P2,P3,P4,P5 pool
+    class HEAD head
+    class TRAIN note
+```
+
+**Phase 3 — fine-tuning.** The convolutional trunk is **frozen entirely**, preserving what was
+learned from the pseudo-labels. Only the head's 131 842 weights — **7.7 % of the model** — are
+retrained on the 70 expert labels.
+
+```mermaid
+flowchart LR
+    IN(["MRI<br/>224×224×3"])
+
+    subgraph FROZEN ["FROZEN — 1 569 568 weights, 92.3%"]
+        direction LR
+        B1["Conv 3→32"] --> P1["Pool<br/>224→112"] --> B2["Conv 32→64"] --> P2["Pool<br/>112→56"] --> B3["Conv 64→128"] --> P3["Pool<br/>56→28"] --> B4["Conv 128→256"] --> P4["Pool<br/>28→14"] --> B5["Conv 256→512"] --> P5["Pool<br/>14→7"]
+    end
+
+    subgraph TRAINED ["TRAINED — 131 842 weights, 7.7%"]
+        HEAD["<b>Head</b><br/>GAP · Flatten<br/>Dropout 0.4 · Linear 512→256 · ReLU<br/>Dropout 0.4 · Linear 256→2<br/>LR 0.001 · 10 epochs"]
+    end
+
+    OUT(["Strong labels<br/>70 train / 30 val"])
+
+    IN --> B1
+    P5 --> HEAD --> OUT
+
+    classDef frozen fill:#B2DFDB,stroke:#00695C,color:#000
+    classDef trained fill:#40C4FF,stroke:#0277BD,color:#000
+    class B1,B2,B3,B4,B5,P1,P2,P3,P4,P5 frozen
+    class HEAD trained
+```
+
+Augmentation (`RandomHorizontalFlip`, `RandomRotation(15)`, `ColorJitter`) compensates for the
+tiny batch. A fourth phase trains the same architecture from scratch on those same 70 labels, as
+the control baseline.
+
+**Interpretability** — a **Grad-CAM** module (forward/backward hooks, context manager guaranteeing
+cleanup) produces activation maps for every model error. Validation images are displayed grouped
+by confusion-matrix quadrant (TP / FN / FP / TN), which makes it legible *why* the model is wrong:
+which region it was looking at when it missed a tumour.
+
+### 5 · State-of-the-art SSL
+
+[`notebooks/5_ssl_sota/`](notebooks/5_ssl_sota/) restarts the problem with a pre-trained
+**EfficientNet-B4** (frozen backbone, only the 1792 → 2 head is trained) and three reference
+semi-supervised methods. The GMM pseudo-labels are **deliberately ignored** here: all 1 406
+images are treated as unlabelled, and it is up to the SSL methods to assign labels.
+
+| Method | Principle | Reference |
+|---|---|---|
+| **Iterative Pseudo-Labeling** | 5 rounds: predict, keep `max(softmax) ≥ 0.95`, retrain | [Lee, 2013](https://www.researchgate.net/publication/280581078) |
+| **Mean Teacher** | Student/Teacher consistency, Teacher = EMA of weights (`α=0.999`), sigmoid rampup over 10 epochs | [Tarvainen & Valpola, 2017](https://arxiv.org/abs/1703.01780) |
+| **FixMatch** | Hard pseudo-label on the *weak* view if confidence ≥ 0.95, CE loss on the *strong* view (RandAugment + Cutout) | [Sohn et al., 2020](https://arxiv.org/abs/2001.07685) |
+
+Two technical traps were found and fixed during code review, documented in
+[`AVANCEMENT.md`](notebooks/5_ssl_sota/AVANCEMENT.md):
+
+* **BatchNorm drift** — a backbone "frozen" via `requires_grad=False` still updates its *running
+  stats* in `train()` mode. A `freeze_backbone_bn()` helper forces the backbone's BN layers back
+  into `eval()` after every `.train()` call.
+* **Buffer EMA** — Mean Teacher must propagate the EMA to BatchNorm *buffers*, not only to
+  parameters, otherwise the Teacher diverges completely at evaluation time.
+
+## 🔎 Reading the results
+
+* **Semi-supervision pays when the backbone is weak.** With `MyCNN` trained from scratch, the
+  1 225 pseudo-labels are worth +13 points of accuracy over pure supervision. With an
+  ImageNet-pretrained EfficientNet-B4, the supervised baseline already reaches 97 %: the useful
+  representations are *already there*, and the SSL methods have little left to add.
+* **FixMatch is the only method that changes the error profile** — same accuracy as the baseline,
+  but recall pushed to 100 %: no tumour missed, at the cost of one extra false alarm. In
+  screening, that is the trade you want.
+* **Clustering finds the structure you let it see.** The GMM separated anatomical slice planes
+  before pathology — moving to `k=4` turned that "failure" into usable information.
+
+## 🚀 Getting started
+
+> [!IMPORTANT]
+> There is no live demo for this project: it needs the 1 506 MRI images and a GPU.
+> The results and figures above *are* the deliverable. Everything below is for reproducing
+> them locally.
+
+### Prerequisites
+
+* **Python 3.12** (constraint `>=3.12,<3.14`)
+* **[uv](https://docs.astral.sh/uv/)**
 
   ```powershell
   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
   ```
 
-* **GPU NVIDIA + CUDA 12.8** *(fortement recommandé)* — le `pyproject.toml` pointe sur l'index
-  `pytorch-cu128`. Le pipeline complet tourne en ~45 min sur une RTX 5070 ; l'exécution CPU est
-  possible mais nettement plus lente.
-* Les **1506 images** placées dans `data/` selon l'arborescence décrite [plus haut](#le-dataset).
+* **NVIDIA GPU + CUDA 12.8** *(strongly recommended)* — `pyproject.toml` points at the
+  `pytorch-cu128` index. The full pipeline runs in ~45 min on an RTX 5070; CPU works but is
+  markedly slower.
+* The **1 506 images** placed in `data/`, following the layout described
+  [above](#-the-dataset).
 
 ### Installation
 
-1. Cloner le dépôt
+```powershell
+git clone https://github.com/KL38/OC_P7_DL_SSL_Brain-Tumor-Detection.git
+cd OC_P7_DL_SSL_Brain-Tumor-Detection
+uv sync
+uv run python -c "import torch; print(torch.cuda.is_available(), torch.__version__)"
+uv run jupyter lab
+```
 
-   ```powershell
-   git clone https://github.com/KL38/OC_P7.git
-   cd OC_P7
-   ```
+### Running order
 
-2. Installer les dépendances (uv crée le `.venv` et résout `uv.lock` automatiquement)
+Notebooks run **in order**, each consuming the previous one's artefacts. Every notebook opens
+with a bootstrap cell that anchors it to the repository root, so it can be launched from
+anywhere.
 
-   ```powershell
-   uv sync
-   ```
-
-3. Vérifier que CUDA est bien détecté
-
-   ```powershell
-   uv run python -c "import torch; print(torch.cuda.is_available(), torch.__version__)"
-   ```
-
-4. Lancer Jupyter
-
-   ```powershell
-   uv run jupyter lab
-   ```
-
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Utilisation
-
-Les notebooks s'exécutent **dans l'ordre**, chacun consommant les artefacts du précédent.
-
-| # | Notebook | Produit | Durée indicative |
+| # | Notebook | Produces | Runtime |
 |---|---|---|---|
-| 1 | [`EDA.ipynb`](EDA.ipynb) | Analyse exploratoire — aucun artefact | ~2 min |
-| 2 | [`Embedding.ipynb`](Embedding.ipynb) | `embeddings/resnet50_embeddings.csv`<br>`embeddings/efficientnet_b4_embeddings.csv` | ~5 min GPU |
-| 3 | [`Clustering GMM.v4.opti.ipynb`](Clustering%20GMM.v4.opti.ipynb) | `pseudo_labels_gmm_v4.csv`<br>`true_labels_test.csv` | ~10 min |
-| 4 | [`Modelisations.v4.ipynb`](Modelisations.v4.ipynb) | `model_phase1.pth`, `model_phase2.pth`<br>`model_supervised.pth` | ~10 min GPU |
-| 5 | [`Optimisation/Semi_Supervise_Optimise.ipynb`](Optimisation/Semi_Supervise_Optimise.ipynb) | `Optimisation/checkpoints/*.pth`<br>`comparison_results.csv` | ~45 min GPU |
+| 1 | [`1_eda.ipynb`](notebooks/1_eda.ipynb) | Exploratory analysis — no artefact | ~2 min |
+| 2 | [`2_embeddings.ipynb`](notebooks/2_embeddings.ipynb) | `embeddings/*.csv` | ~5 min GPU |
+| 3 | [`3_clustering_gmm_v4_final.ipynb`](notebooks/3_clustering_gmm_v4_final.ipynb) | `pseudo_labels_gmm_v4.csv`, `true_labels_test.csv` | ~10 min |
+| 4 | [`4_modeling_v4_final.ipynb`](notebooks/4_modeling_v4_final.ipynb) | `model_phase{1,2}.pth`, `model_supervised.pth` | ~10 min GPU |
+| 5 | [`5_ssl_sota/ssl_methods_comparison.ipynb`](notebooks/5_ssl_sota/ssl_methods_comparison.ipynb) | `checkpoints/*.pth`, `comparison_results.csv` | ~45 min GPU |
 
-Les versions `v1` → `v4` de chaque notebook documentent les itérations successives et se
-consomment par paires : `Clustering GMM.vN` produit `pseudo_labels_gmm_vN.csv`, consommé par
-`Modelisations.vN`. La **v4 est la version finale**.
+Versions `v1` → `v4` document the successive iterations and consume in pairs:
+`3_clustering_gmm_vN` produces `pseudo_labels_gmm_vN.csv`, consumed by `4_modeling_vN`.
+**v4 is the final version.**
 
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Pipeline méthodologique
-
-### 1 · EDA
-
-Inventaire des 1506 fichiers, contrôle d'intégrité (ouverture PIL de chaque image, remontée
-explicite des fichiers corrompus), vérification de l'homogénéité des résolutions et des modes
-couleur, et détection d'outliers par IQR sur la taille des fichiers — avec affichage systématique
-des images suspectes pour arbitrage visuel.
-
-**Constat** : dataset parfaitement homogène (512×512, RGB) — aucun nettoyage requis.
-
-### 2 · Extraction de features (embeddings)
-
-Deux backbones ImageNet sont comparés, **couches entièrement gelées** (`eval()` + `no_grad()`,
-aucune descente de gradient) : le réseau sert de pur extracteur de descripteurs visuels.
-
-| Backbone | Dimension de sortie | Traitement |
-|---|:---:|---|
-| ResNet-50 (`IMAGENET1K_V2`) | 2048 | `fc` remplacé par `Identity()` |
-| EfficientNet-B4 | 1792 | Tête de classification retirée |
-
-Prétraitement commun : `Resize(224, 224)` → `ToTensor()` → `Normalize()` aux statistiques
-ImageNet (`mean=[0.485, 0.456, 0.406]`, `std=[0.229, 0.224, 0.225]`).
-
-### 3 · Clustering non supervisé
-
-**Réduction de dimension** — standardisation puis PCA à 95 % de variance expliquée :
-
-| Backbone | Dimensions | → | Composantes retenues |
-|---|:---:|:---:|:---:|
-| ResNet-50 | 2048 | → | 658 |
-| **EfficientNet-B4** | 1792 | → | **379** |
-
-**Choix de l'algorithme** — trois familles évaluées à l'ARI sur les 100 images labellisées :
-
-| Algorithme | ARI | Verdict |
-|---|:---:|---|
-| DBSCAN | — | Écarté — pas de structure de densité exploitable en haute dimension |
-| K-Means (ResNet-50) | 0.24 | Écarté |
-| K-Means (EfficientNet-B4) | 0.33 | Écarté — frontières linéaires trop rigides |
-| **GMM (EfficientNet-B4)** | **0.33 → 0.35** | **Retenu** — covariances pleines, sortie probabiliste |
-
-Le GMM l'emporte moins sur le score brut que sur sa **sortie probabiliste** : `predict_proba()`
-donne une mesure de confiance par image, indispensable pour filtrer les pseudo-labels par la
-suite. Visualisation t-SNE (`perplexity=30`) pour contrôler la séparabilité.
-
-**Les quatre itérations d'optimisation** :
-
-| Version | Stratégie | Idée directrice |
-|---|---|---|
-| **V1** | GMM `k=2`, aucun filtrage | Référence — 1406 pseudo-labels bruts |
-| **V2** | Seuil de confiance sur la distance euclidienne aux centroïdes | Écarter les points frontière |
-| **V3** | Seuil de confiance par régression logistique Out-Of-Fold | Confiance calibrée plutôt que géométrique |
-| **V4** | GMM `k=4` + nettoyage Random Forest OOF | **Version finale** |
-
-La **V4** part d'une observation visuelle : la t-SNE révèle **quatre blobs**, pas deux. Le
-diagnostic est net une fois les clusters affichés — le GMM sépare d'abord les images par **plan
-de coupe anatomique** (axial, sagittal, coronal), pas par pathologie. Fitter `k=4` puis mapper
-les clusters vers les classes (C0 → normal, C1/C2/C3 → cancer) respecte cette structure latente
-au lieu de la combattre.
-
-Les pseudo-labels sont ensuite **nettoyés par Random Forest calibrée** (500 arbres,
-`max_depth=12`, `class_weight='balanced'`, calibration Platt en CV interne 3-fold, prédictions
-Out-Of-Fold sur `StratifiedKFold` 5-fold — soit 15 fits) : chaque image reçoit une confiance
-hors-échantillon, et **1225 images sur 1406** franchissent le seuil retenu.
-
-> Accuracy OOF de la RF sur les clusters : **0.971** — les clusters sont géométriquement très
-> bien séparés, ce qui légitime le filtrage.
-
-### 4 · Modélisation en 3 phases
-
-**Architecture `MyCNN`** — CNN maison, 1 701 410 paramètres : 5 blocs
-`Conv2d → BatchNorm2d → ReLU → MaxPool2d` (32 → 64 → 128 → 256 → 512 canaux, 224px → 7px),
-puis Global Average Pooling, dropout 0.4 et tête linéaire 2 classes.
-
-| Phase | Données | Poids entraînés | Objectif |
-|---|---|---|---|
-| **1 — Semi-supervisé** | 1225 pseudo-labels | Tous (1.70 M) | Apprendre les représentations visuelles |
-| **2 — Fine-tuning** | 70 labels experts | Tête seule (131 842, soit **7.7 %**) | Recalibrer la frontière de décision |
-| **3 — Supervisé pur** | 70 labels experts | Tous, depuis zéro | Baseline de contrôle |
-
-La **phase 2** est le cœur du dispositif : le backbone convolutif est intégralement gelé, ce qui
-préserve les représentations acquises sur les 1225 pseudo-labels, et seules les 131 842 poids de
-la tête de classification sont réajustés sur les labels experts — avec augmentation
-(`RandomHorizontalFlip`, `RandomRotation(15)`, `ColorJitter`) pour compenser la taille du lot.
-
-**Interprétabilité** — un module **Grad-CAM** (hooks forward/backward, context manager garantissant
-le nettoyage) génère les cartes d'activation sur chaque erreur du modèle. Les images de validation
-sont affichées regroupées par quadrant de matrice de confusion (TP / FN / FP / TN), ce qui rend
-lisible *pourquoi* le modèle se trompe : sur quelle zone il regardait quand il a manqué une tumeur.
-
-### 5 · Optimisation SSL SOTA
-
-Le dossier [`Optimisation/`](Optimisation/) reprend le problème avec un **EfficientNet-B4
-pré-entraîné** (backbone gelé, seule la tête 1792 → 2 est entraînée) et trois méthodes
-semi-supervisées de référence. Les pseudo-labels GMM y sont **délibérément ignorés** : les 1406
-images sont traitées comme non labellisées, c'est aux méthodes SSL d'attribuer les labels.
-
-| Méthode | Principe | Référence |
-|---|---|---|
-| **Pseudo-Labeling itératif** | 5 itérations : prédire, garder `max(softmax) ≥ 0.95`, réentraîner | Lee, 2013 |
-| **Mean Teacher** | Cohérence Student/Teacher, Teacher = EMA des poids (`α=0.999`), rampup sigmoïde sur 10 epochs | Tarvainen & Valpola, 2017 |
-| **FixMatch** | Pseudo-label *hard* sur vue *weak* si confiance ≥ 0.95, loss CE sur vue *strong* (RandAugment + Cutout) | Sohn et al., 2020 |
-
-Deux pièges techniques identifiés et traités lors de la revue de code, documentés dans
-[`Optimisation/AVANCEMENT.md`](Optimisation/AVANCEMENT.md) :
-
-* **Dérive des BatchNorm** — un backbone « gelé » via `requires_grad=False` continue de mettre à
-  jour ses *running stats* en mode `train()`. Un helper `freeze_backbone_bn()` force les couches
-  BN du backbone en `eval()` après chaque `.train()`.
-* **EMA des buffers** — Mean Teacher doit propager l'EMA aux buffers BatchNorm, pas seulement aux
-  paramètres, sous peine de voir le Teacher diverger complètement en évaluation.
-
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Résultats détaillés
-
-### Pipeline principal — `MyCNN` (val set, 30 images)
-
-| Modèle | Accuracy | Precision | Recall | F1 | F2 | ARI |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| GMM — clustering seul | 0.800 | 1.000 | 0.600 | 0.750 | 0.652 | 0.341 |
-| Phase 1 — pseudo-labels (1225) | 0.833 | 1.000 | 0.667 | 0.800 | 0.714 | 0.427 |
-| **Phase 2 — fine-tuning (1225 + 70)** | **0.900** | 0.929 | **0.867** | **0.897** | **0.878** | **0.627** |
-| Phase 3 — supervisé pur (70) | 0.767 | 0.750 | 0.800 | 0.774 | 0.789 | 0.259 |
-
-### Volet optimisation — `EfficientNet-B4` (val set, 30 images)
-
-| Modèle | Accuracy | Precision | Recall | F1 | F2 | ARI |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| MyCNN Phase 1 | 0.800 | 0.800 | 0.800 | 0.800 | 0.800 | 0.337 |
-| MyCNN Phase 2 | 0.900 | 0.875 | 0.933 | 0.903 | 0.921 | 0.627 |
-| MyCNN Phase 3 | 0.833 | 0.813 | 0.867 | 0.839 | 0.855 | 0.425 |
-| EffNet-B4 — baseline supervisée (70) | 0.967 | 1.000 | 0.933 | 0.966 | 0.946 | 0.867 |
-| EffNet-B4 + Pseudo-Labeling | 0.967 | 1.000 | 0.933 | 0.966 | 0.946 | 0.867 |
-| EffNet-B4 + Mean Teacher | 0.967 | 1.000 | 0.933 | 0.966 | 0.946 | 0.867 |
-| **EffNet-B4 + FixMatch** | **0.967** | 0.938 | **1.000** | **0.968** | **0.987** | 0.867 |
-
-> Les lignes `MyCNN` de ce second tableau proviennent du rechargement des checkpoints `.pth`
-> tels qu'ils existaient lors de l'exécution du notebook d'optimisation (avant la V4) : elles
-> diffèrent légèrement du tableau précédent, qui reflète les pseudo-labels V4. La comparaison
-> reste valide *au sein* de chaque tableau, tous deux évalués sur le même val set de 30 images.
-
-### Lecture des résultats
-
-* **Le semi-supervisé paye quand le backbone est faible.** Avec `MyCNN` entraîné de zéro, les 1225
-  pseudo-labels apportent +13,3 points d'accuracy sur le supervisé pur. Avec un EfficientNet-B4
-  pré-entraîné sur ImageNet, la baseline supervisée atteint déjà 0.967 : les représentations
-  utiles sont déjà là, et les méthodes SSL n'ont plus grand-chose à ajouter.
-* **FixMatch est le seul à changer le profil d'erreur** — même accuracy que la baseline, mais
-  recall porté à 1.000 : aucune tumeur manquée, au prix d'une fausse alarme supplémentaire.
-  C'est précisément l'arbitrage souhaitable en dépistage.
-* **Le clustering trouve la structure qu'on lui donne à voir.** Le GMM a d'abord séparé les plans
-  de coupe anatomiques avant la pathologie — le passage à `k=4` transforme cette « erreur » en
-  information exploitable.
-
-> [!WARNING]
-> **Limites.** Le val set ne compte que **30 images** : les intervalles de confiance sont larges
-> et un écart de 3 points correspond à une seule image. Aucune validation croisée n'a été menée
-> sur le split final (sensibilité au `random_state`). Enfin, le backbone gelé dans le volet
-> optimisation bride mécaniquement le potentiel des méthodes SSL, qui n'agissent que sur la tête
-> de classification.
-
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Structure du projet
+## 📁 Repository layout
 
 ```text
 OC_P7/
-├── EDA.ipynb                          # 1 · Analyse exploratoire
-├── Embedding.ipynb                    # 2 · Extraction ResNet-50 & EfficientNet-B4
+├── docs/                                   # Figures used by this README
+├── notebooks/
+│   ├── 1_eda.ipynb                         # 1 · Exploratory analysis
+│   ├── 2_embeddings.ipynb                  # 2 · ResNet-50 & EfficientNet-B4 extraction
+│   ├── 3_clustering_gmm_v1..v3.ipynb       # 3 · Clustering — iterations
+│   ├── 3_clustering_gmm_v4_final.ipynb     #     k=4 + Random Forest cleaning  ★
+│   ├── 4_modeling_v1..v3.ipynb             # 4 · Three-phase CNN — iterations
+│   ├── 4_modeling_v4_final.ipynb           #     final  ★
+│   ├── 5_ssl_sota/
+│   │   ├── ssl_methods_comparison.ipynb    # 5 · EfficientNet-B4 + SSL SOTA
+│   │   ├── AVANCEMENT.md                   #     design journal & code review
+│   │   └── checkpoints/                    #     weights + histories   (not versioned)
+│   └── discarded/
+│       └── clustering_dbscan.ipynb         # Rejected avenue, kept for the record
 │
-├── Clustering GMM.ipynb               # 3 · Clustering — V1 (référence)
-├── Clustering GMM.v2.ipynb            #        V2 — seuil distance aux centroïdes
-├── Clustering GMM.v3.ipynb            #        V3 — seuil régression logistique OOF
-├── Clustering GMM.v4.opti.ipynb       #        V4 — k=4 + nettoyage Random Forest ★
-│
-├── Modelisations.ipynb                # 4 · CNN 3 phases — V1
-├── Modelisations.v2.ipynb             #        V2
-├── Modelisations.v3.ipynb             #        V3
-├── Modelisations.v4.ipynb             #        V4 (finale) ★
-│
-├── Optimisation/                      # 5 · EfficientNet-B4 + SSL SOTA
-│   ├── Semi_Supervise_Optimise.ipynb  #     Pseudo-Labeling / Mean Teacher / FixMatch
-│   ├── AVANCEMENT.md                  #     Journal de conception et revue de code
-│   └── checkpoints/                   #     Poids + historiques d'entraînement
-│
-├── Clustering fail trials/            # Pistes écartées (DBSCAN)
-├── Notebook olds/                     # Itérations antérieures (K-Means, ImageNet)
-├── Cours/                             # Notebooks pédagogiques sur les méthodes SSL
-├── livrables/                         # Livrables OpenClassrooms + support de soutenance
-│
-├── data/                              # Images (non versionné)
-├── embeddings/                        # Vecteurs de features (non versionné)
-├── pseudo_labels_gmm_v*.csv           # Pseudo-labels par version (non versionné)
-├── true_labels_test.csv               # 100 labels experts (non versionné)
-├── model_phase{1,2}.pth               # Poids MyCNN phases 1 & 2
-├── model_supervised.pth               # Poids MyCNN supervisé pur
-└── pyproject.toml                     # Dépendances (uv)
+├── data/                                   # 1 506 MRI images         (not versioned)
+├── embeddings/                             # Feature vectors          (not versioned)
+├── pseudo_labels_gmm_v*.csv                # Pseudo-labels per round  (not versioned)
+├── true_labels_test.csv                    # 100 expert labels        (not versioned)
+├── model_*.pth                             # MyCNN weights            (not versioned)
+└── pyproject.toml                          # Dependencies (uv)
 ```
 
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
+> [!NOTE]
+> Notebooks resolve every artefact from the **repository root**, not from their own directory —
+> including the `image_path` column stored inside the CSVs. The bootstrap cell at the top of each
+> notebook walks up to the folder containing `pyproject.toml` and `chdir`s there, which is what
+> lets them live in `notebooks/` while every path in the code stays unchanged.
 
-## Roadmap
+## 🚧 Limitations
 
-- [x] EDA et contrôle d'intégrité du dataset
-- [x] Extraction d'embeddings ResNet-50 & EfficientNet-B4
-- [x] Comparaison DBSCAN / K-Means / GMM
-- [x] Optimisation du clustering — V1 → V4 (`k=4` + nettoyage Random Forest OOF)
-- [x] Pipeline CNN en 3 phases avec baseline supervisée de contrôle
-- [x] Interprétabilité par Grad-CAM sur les erreurs de validation
-- [x] Méthodes SSL état de l'art — Pseudo-Labeling, Mean Teacher, FixMatch
+> [!WARNING]
+> **The validation set holds only 30 images.** Confidence intervals are wide and a 3-point gap
+> corresponds to a single image. No cross-validation was run on the final split, so sensitivity
+> to `random_state` is unmeasured. Finally, the frozen backbone in the SSL study mechanically
+> caps what those methods can achieve, since they only ever act on the classification head.
 
+## 📄 Licence & disclaimer
 
-Voir les [issues ouvertes](https://github.com/KL38/OC_P7/issues) pour la liste complète.
-
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Licence
-
-Projet réalisé dans le cadre de la formation OpenClassrooms — **usage académique**.
-
-Le dataset d'images cérébrales est distribué en **utilisation libre à des fins académiques**
-(voir `data/Jeu de Données d'Images Cérébrales pour la Détection de Tumeurs.txt`).
+Academic work, produced as part of the OpenClassrooms *Data Scientist & Machine Learning
+Engineer* path. The brain MRI dataset is distributed for **free academic use**.
 
 > [!CAUTION]
-> Ce travail est un **exercice pédagogique**. Il n'a fait l'objet d'aucune validation clinique et
-> ne doit en aucun cas être utilisé à des fins de diagnostic médical.
+> This is a **teaching exercise**. It has undergone no clinical validation whatsoever and must
+> never be used for medical diagnosis.
 
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Contact
-
-**Kevin Lebayle** — [@KL38](https://github.com/KL38)
-
-Lien du projet : [https://github.com/KL38/OC_P7](https://github.com/KL38/OC_P7)
-
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-## Remerciements
-
-* [OpenClassrooms — Data Scientist & ML Engineer](https://openclassrooms.com/fr/paths/1682-data-scientist-machine-learning-engineer)
-* [Lee, D.-H. (2013) — *Pseudo-Label*](https://www.researchgate.net/publication/280581078)
-* [Tarvainen & Valpola (2017) — *Mean Teachers are Better Role Models*](https://arxiv.org/abs/1703.01780)
-* [Sohn et al. (2020) — *FixMatch*](https://arxiv.org/abs/2001.07685)
-* [Selvaraju et al. (2017) — *Grad-CAM*](https://arxiv.org/abs/1610.02391)
-* [Tan & Le (2019) — *EfficientNet*](https://arxiv.org/abs/1905.11946)
-* [Best-README-Template](https://github.com/othneildrew/Best-README-Template) — modèle de ce README
-* [Shields.io](https://shields.io) — badges
-
-<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
-
-<!-- LIENS & IMAGES -->
-[python-shield]: https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white
-[python-url]: https://www.python.org/
-[pytorch-shield]: https://img.shields.io/badge/PyTorch-CUDA%2012.8-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white
-[pytorch-url]: https://pytorch.org/
-[torchvision-shield]: https://img.shields.io/badge/Torchvision-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white
-[torchvision-url]: https://pytorch.org/vision/stable/index.html
-[sklearn-shield]: https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white
-[sklearn-url]: https://scikit-learn.org/
-[numpy-shield]: https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white
-[numpy-url]: https://numpy.org/
-[pandas-shield]: https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white
-[pandas-url]: https://pandas.pydata.org/
-[matplotlib-shield]: https://img.shields.io/badge/Matplotlib-11557C?style=for-the-badge&logo=python&logoColor=white
-[matplotlib-url]: https://matplotlib.org/
-[plotly-shield]: https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white
-[plotly-url]: https://plotly.com/python/
-[opencv-shield]: https://img.shields.io/badge/OpenCV-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white
-[opencv-url]: https://opencv.org/
-[jupyter-shield]: https://img.shields.io/badge/Jupyter-F37626?style=for-the-badge&logo=jupyter&logoColor=white
-[jupyter-url]: https://jupyter.org/
-[uv-shield]: https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white
-[uv-url]: https://docs.astral.sh/uv/
-[license-shield]: https://img.shields.io/badge/Licence-Acad%C3%A9mique-lightgrey?style=for-the-badge
-[license-url]: #licence
-[oc-shield]: https://img.shields.io/badge/OpenClassrooms-Projet%207-7451EB?style=for-the-badge
-[oc-url]: https://openclassrooms.com/
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
